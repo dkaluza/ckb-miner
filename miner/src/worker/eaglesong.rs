@@ -98,7 +98,7 @@ impl Worker for EaglesongCpu {
     fn run(&mut self, progress_bar: ProgressBar) {
         let mut state_update_counter = 0usize;
         let mut start = Instant::now();
-        loop {
+        {
             self.poll_worker_message();
             if self.start {
                 if let Some((pow_hash, target)) = self.pow_info.clone() {

@@ -19,14 +19,24 @@ pub enum WorkerMessage {
     NewWork((Byte32, U256)),
 }
 
-#[derive(Clone)]
 pub struct WorkerController {
     inner: Vec<Sender<WorkerMessage>>,
+    cpu_workers: Vec<(eaglesong::EaglesongCpu, ProgressBar)>
+}
+
+impl Clone for WorkerController {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            cpu_workers: Vec::new()
+        }
+    }
 }
 
 impl WorkerController {
-    pub fn new(inner: Vec<Sender<WorkerMessage>>) -> Self {
-        Self { inner }
+    pub fn new(inner: Vec<Sender<WorkerMessage>>,
+               cpu_workers: Vec<(eaglesong::EaglesongCpu, ProgressBar)>) -> Self {
+        Self { inner, cpu_workers }
     }
 
     pub fn send_message(&self, message: WorkerMessage) {
@@ -46,6 +56,7 @@ pub fn start_worker(
     mp: &MultiProgress,
 ) -> WorkerController {
     let mut worker_txs = Vec::new();
+    let mut workers = Vec::new();
     #[cfg(feature = "cuda")]
     for g in config.gpus {
         for i in g.gpu_ids {
@@ -58,6 +69,7 @@ pub fn start_worker(
 
             let (worker_tx, worker_rx) = unbounded();
             let seal_tx = seal_tx.clone();
+
             thread::Builder::new()
                 .name(worker_name)
                 .spawn(move || {
@@ -113,19 +125,15 @@ pub fn start_worker(
         pb.set_style(ProgressStyle::default_bar().template(PROGRESS_BAR_TEMPLATE));
         pb.set_prefix(&worker_name);
 
+
         let (worker_tx, worker_rx) = unbounded();
         let seal_tx = seal_tx.clone();
-        thread::Builder::new()
-            .name(worker_name)
-            .spawn(move || {
-                let mut worker = eaglesong::EaglesongCpu::new(seal_tx, worker_rx, arch);
-                worker.run(pb);
-            })
-            .expect("Start `EaglesongCpu` worker thread failed");
+        let mut worker = eaglesong::EaglesongCpu::new(seal_tx, worker_rx, arch);
+        workers.push((worker, pb));
         worker_txs.push(worker_tx);
     }
 
-    WorkerController::new(worker_txs)
+    WorkerController::new(worker_txs, workers)
 }
 
 pub trait Worker {

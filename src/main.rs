@@ -32,6 +32,20 @@ fn main() {
     }
 }
 
+#[no_mangle]
+pub extern fn get_miner() -> Miner {
+    if let Ok(config) = read_config(None) {
+        let version = get_version();
+        let _logger_guard = ckb_logger::init(config.logger).expect("Init logger failed!");
+        let _sentry_guard = sentry_init(&config.sentry, &version);
+
+        let client = Client::new(config.miner.clone());
+        let mut miner = Miner::new(client, config.miner);
+        return miner;
+    }
+    panic!("No config!");
+}
+
 fn read_config(cfg_path: Option<String>) -> Result<AppConfig, ExitCode> {
     let cfg_path = match cfg_path {
         Some(s) => PathBuf::from(s),
