@@ -25,5 +25,5 @@ opencl = ["miner/opencl"]
 
 [lib]
 name = "ckb_miner"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "cdylib"]
 path="src/main.rs"

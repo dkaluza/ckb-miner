@@ -33,17 +33,31 @@ fn main() {
 }
 
 #[no_mangle]
-pub extern fn get_miner() -> Miner {
+pub extern fn get_miner() -> *mut Miner {
     if let Ok(config) = read_config(None) {
         let version = get_version();
         let _logger_guard = ckb_logger::init(config.logger).expect("Init logger failed!");
         let _sentry_guard = sentry_init(&config.sentry, &version);
 
         let client = Client::new(config.miner.clone());
-        let mut miner = Miner::new(client, config.miner);
-        return miner;
+        let mut miner = Box::new(Miner::new(client, config.miner));
+        return Box::into_raw(miner);
     }
     panic!("No config!");
+}
+
+#[no_mangle]
+pub extern fn run_mined_seals_sending(miner: *mut Miner) {
+    unsafe {
+        (*miner).run();
+    }
+}
+
+#[no_mangle]
+pub extern fn run_miner_worker(miner: *mut Miner, worker_number: usize) {
+    unsafe {
+        (*miner).run_worker(worker_number);
+    }
 }
 
 fn read_config(cfg_path: Option<String>) -> Result<AppConfig, ExitCode> {

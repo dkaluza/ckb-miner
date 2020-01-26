@@ -95,7 +95,7 @@ impl EaglesongCpu {
 }
 
 impl Worker for EaglesongCpu {
-    fn run(&mut self, progress_bar: ProgressBar) {
+    fn run(&mut self, progress_bar: &ProgressBar) {
         let mut state_update_counter = 0usize;
         let mut start = Instant::now();
         {

@@ -21,7 +21,7 @@ pub enum WorkerMessage {
 
 pub struct WorkerController {
     inner: Vec<Sender<WorkerMessage>>,
-    cpu_workers: Vec<(eaglesong::EaglesongCpu, ProgressBar)>
+    pub cpu_workers: Vec<(eaglesong::EaglesongCpu, ProgressBar)>
 }
 
 impl Clone for WorkerController {
@@ -137,5 +137,5 @@ pub fn start_worker(
 }
 
 pub trait Worker {
-    fn run(&mut self, progress_bar: ProgressBar);
+    fn run(&mut self, progress_bar: &ProgressBar);
 }

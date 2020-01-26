@@ -1,5 +1,5 @@
 use crate::client::Client;
-use crate::worker::{start_worker, WorkerController, WorkerMessage};
+use crate::worker::{start_worker, WorkerController, WorkerMessage, Worker};
 use crate::MinerConfig;
 use crate::Work;
 use ckb_logger::{debug, error, info};
@@ -11,6 +11,7 @@ use lru_cache::LruCache;
 use std::sync::Arc;
 use std::thread;
 use std::time;
+
 
 const WORK_CACHE_SIZE: usize = 32;
 
@@ -83,6 +84,12 @@ impl Miner {
                 }
             }
         }
+    }
+
+    pub fn run_worker(&mut self, worker_number: usize) {
+        let worker_number = worker_number % self.worker_controller.cpu_workers.len();
+        let (ref mut worker, ref progress) = self.worker_controller.cpu_workers[worker_number];
+        worker.run(progress);
     }
 
     fn submit_seal(&mut self, pow_hash: Byte32, nonce: u128) {
