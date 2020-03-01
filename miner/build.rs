@@ -5,22 +5,27 @@ use std::path::Path;
 
 fn main() {
     if cfg!(windows) {
-        cc::Build::new()
-            .file("src/worker/include/eaglesong.c")
-            .include("src/worker/include")
-            .compile("libeaglesong.a.0");
+        if cc::Build::new().get_compiler().is_like_msvc() {
+            cc::Build::new()
+                .file("src/worker/include/eaglesong.c")
+                .include("src/worker/include")
+                .compile("libeaglesong.a.0");
 
-        cc::Build::new()
-            .file("src/worker/include/eaglesong_avx2.c")
-            .include("src/worker/include")
-            .flag("/arch:AVX2")
-            .compile("libeaglesong.a.1");
+            cc::Build::new()
+                .file("src/worker/include/eaglesong_avx2.c")
+                .include("src/worker/include")
+                .flag("/arch:AVX2")
+                .compile("libeaglesong.a.1");
 
-        cc::Build::new()
-            .file("src/worker/include/eaglesong_avx512.c")
-            .include("src/worker/include")
-            .flag("/arch:AVX512")
-            .compile("libeaglesong.a.2");
+            cc::Build::new()
+                .file("src/worker/include/eaglesong_avx512.c")
+                .include("src/worker/include")
+                .flag("/arch:AVX512")
+                .compile("libeaglesong.a.2");
+        }
+        else {
+            compile_gcc_like();
+        }
 
         #[cfg(feature = "opencl")]
         {
@@ -69,31 +74,7 @@ fn main() {
             println!("cargo:rustc-link-lib=cudart");
         }
     } else {
-        cc::Build::new()
-            .file("src/worker/include/eaglesong.c")
-            .include("src/worker/include")
-            .flag("-O3")
-            .flag("-lcrypto")
-            .static_flag(true)
-            .compile("libeaglesong.a.0");
-
-        cc::Build::new()
-            .file("src/worker/include/eaglesong_avx2.c")
-            .include("src/worker/include")
-            .flag("-O3")
-            .flag("-lcrypto")
-            .flag("-mavx2")
-            .static_flag(true)
-            .compile("libeaglesong.a.1");
-
-        cc::Build::new()
-            .file("src/worker/include/eaglesong_avx512.c")
-            .include("src/worker/include")
-            .flag("-O3")
-            .flag("-lcrypto")
-            .flag("-mavx512f")
-            .static_flag(true)
-            .compile("libeaglesong.a.2");
+        compile_gcc_like();
 
         #[cfg(feature = "opencl")]
         {
@@ -141,4 +122,34 @@ fn main() {
             println!("cargo:rustc-link-lib=cudart");
         }
     }
+}
+
+fn compile_gcc_like() {
+    cc::Build::new()
+        .file("src/worker/include/eaglesong.c")
+        .include("src/worker/include")
+        .flag("-O3")
+        .flag("-lcrypto")
+        .static_flag(true)
+        .compile("libeaglesong.a.0");
+
+    cc::Build::new()
+        .file("src/worker/include/eaglesong_avx2.c")
+        .include("src/worker/include")
+        .flag("-O3")
+        .flag("-lcrypto")
+        .flag("-mavx2")
+        .flag("-fno-asynchronous-unwind-tables")
+        .static_flag(true)
+        .compile("libeaglesong.a.1");
+
+    cc::Build::new()
+        .file("src/worker/include/eaglesong_avx512.c")
+        .include("src/worker/include")
+        .flag("-O3")
+        .flag("-lcrypto")
+        .flag("-mavx512f")
+        .flag("-fno-asynchronous-unwind-tables")
+        .static_flag(true)
+        .compile("libeaglesong.a.2");
 }
