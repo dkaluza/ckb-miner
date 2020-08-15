@@ -5,6 +5,8 @@ use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
 use std::thread;
 use std::time::{Duration, Instant};
+use std::cell::RefCell;
+
 
 const STATE_UPDATE_DURATION_MILLIS: u128 = 300;
 
@@ -94,31 +96,52 @@ impl EaglesongCpu {
     }
 }
 
+
+thread_local! {
+    static HASH_COUNTER : RefCell<usize> = RefCell::new(0);
+    static THREAD_START :  RefCell<Instant> = RefCell::new(Instant::now());
+}
+
 impl Worker for EaglesongCpu {
     fn run(&mut self, progress_bar: &ProgressBar) {
+
         let mut state_update_counter = 0usize;
         let mut start = Instant::now();
         {
             self.poll_worker_message();
             if self.start {
                 if let Some((pow_hash, target)) = self.pow_info.clone() {
-                    state_update_counter += self.solve(&pow_hash, &target);
+                    let new_hashes_count = self.solve(&pow_hash, &target);
+                    state_update_counter += new_hashes_count;
 
-                    let elapsed = start.elapsed();
-                    if elapsed.as_millis() > STATE_UPDATE_DURATION_MILLIS {
-                        let elapsed_nanos: f64 = (elapsed.as_secs() * 1_000_000_000
-                            + u64::from(elapsed.subsec_nanos()))
-                            as f64
-                            / 1_000_000_000.0;
-                        progress_bar.set_message(&format!(
-                            "hash rate: {:>10.3} / seals found: {:>10}",
-                            state_update_counter as f64 / elapsed_nanos,
-                            self.seal_candidates_found,
-                        ));
-                        progress_bar.inc(1);
-                        state_update_counter = 0;
-                        start = Instant::now();
-                    }
+                    HASH_COUNTER.with(|h_counter|{
+                        *h_counter.borrow_mut() += new_hashes_count;
+
+                        let elapsed = start.elapsed();
+                        if elapsed.as_millis() > STATE_UPDATE_DURATION_MILLIS {
+                            let elapsed_nanos: f64 = (elapsed.as_secs() * 1_000_000_000
+                                + u64::from(elapsed.subsec_nanos()))
+                                as f64
+                                / 1_000_000_000.0;
+
+                            THREAD_START.with(|t_start|{
+                                let t_elapsed = (*t_start.borrow()).elapsed();
+                                let elapsed_start_nanos: f64 = (t_elapsed.as_secs() * 1_000_000_000
+                                    + u64::from(t_elapsed.subsec_nanos()))
+                                    as f64
+                                    / 1_000_000_000.0;
+                                progress_bar.set_message(&format!(
+                                    "hash rate real: {:>10.3} / hash rate: {:>10.3} / seals found: {:>10}",
+                                    *h_counter.borrow() as f64 / elapsed_start_nanos,
+                                    state_update_counter as f64 / elapsed_nanos,
+                                    self.seal_candidates_found,
+                                ));
+                            });
+                            progress_bar.inc(1);
+                            state_update_counter = 0;
+                            start = Instant::now();
+                        }
+                    });
                 }
             } else {
                 // reset state and sleep
